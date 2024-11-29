@@ -10,6 +10,7 @@ import (
 	"github.com/VarthanV/pub-sub/pkg/queue"
 )
 
+// Broker orchestrates the  whole pub-sub process
 type Broker struct {
 	mu        sync.Mutex
 	exchanges map[string]*exchange.Exchange
@@ -24,6 +25,7 @@ func New() *Broker {
 	}
 }
 
+// CreateExchange creates an exchange with the given type
 func (b *Broker) CreateExchange(name string, exchangeType exchange.ExchangeType) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -37,6 +39,8 @@ func (b *Broker) CreateExchange(name string, exchangeType exchange.ExchangeType)
 	return nil
 }
 
+// CreateQueue creates a queue, if needs to survive the rebuidling during restart
+// can be configured using the `durable` flag
 func (b *Broker) CreateQueue(name string, durable bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -49,6 +53,7 @@ func (b *Broker) CreateQueue(name string, durable bool) error {
 	return nil
 }
 
+// BindQueue binds a queue to an exchange  by the given binding key
 func (b *Broker) BindQueue(queueName, exchangeName, bindingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
