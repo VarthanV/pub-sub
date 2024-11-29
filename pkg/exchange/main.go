@@ -12,13 +12,13 @@ const (
 type Exchange struct {
 	Name         string
 	ExchangeType ExchangeType
-	Bindings     []binding.Binding
+	Bindings     map[string]*binding.Binding
 }
 
 func New(name string, exchangeType ExchangeType) *Exchange {
 	return &Exchange{
 		Name:         name,
 		ExchangeType: exchangeType,
-		Bindings:     make([]binding.Binding, 0),
+		Bindings:     make(map[string]*binding.Binding),
 	}
 }

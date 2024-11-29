@@ -61,11 +61,24 @@ func (b *Broker) BindQueue(queueName, exchangeName, bindingKey string) error {
 	if !exists {
 		errors.Handle(errors.ErrQueueDoesnotExist)
 	}
+	if exchange.Bindings == nil {
+		exchange.Bindings = make(map[string]*binding.Binding)
+	}
 
-	exchange.Bindings = append(exchange.Bindings, binding.Binding{
-		Key:    bindingKey,
-		Queues: []*queue.Queue{q},
-	})
+	bi, exists := exchange.Bindings[bindingKey]
+	if !exists {
+		bi = &binding.Binding{
+			Key:    bindingKey,
+			Queues: []*queue.Queue{},
+		}
+		exchange.Bindings[bindingKey] = bi
+	}
+
+	for _, bq := range bi.Queues {
+		if q == bq {
+			return nil
+		}
+	}
+	bi.Queues = append(bi.Queues, q)
 	return nil
-
 }
