@@ -1,28 +1,63 @@
 package broker
 
 import (
+	"context"
 	"sync"
 
-	"github.com/VarthanV/pub-sub/pkg/binding"
-	"github.com/VarthanV/pub-sub/pkg/errors"
+	"github.com/VarthanV/pub-sub/binding"
+	"github.com/VarthanV/pub-sub/errors"
+	"gorm.io/gorm"
 
-	"github.com/VarthanV/pub-sub/pkg/exchange"
-	"github.com/VarthanV/pub-sub/pkg/queue"
+	"github.com/VarthanV/pub-sub/exchange"
+	"github.com/VarthanV/pub-sub/queue"
 )
 
 // Broker orchestrates the  whole pub-sub process
 type Broker struct {
-	mu        sync.Mutex
+	db *gorm.DB
+	mu sync.Mutex
+	// mapping of exchanges available in the current run-time
 	exchanges map[string]*exchange.Exchange
-	queues    map[string]*queue.Queue
+	// mapping of queues available in the current run-time
+	queues map[string]*queue.Queue
+	// we will be persisting the exchanges info ,queues info to a persistent storage to rebuild on crash
+	// fixed amount of workers will be bound to this channel , buffered writers will be used and the data
+	// will be flushed when the buffer gets full or when the ticker ticks whichever happens first
+	persistQueue chan interface{}
 }
 
 func New() *Broker {
-	return &Broker{
-		mu:        sync.Mutex{},
-		exchanges: make(map[string]*exchange.Exchange),
-		queues:    make(map[string]*queue.Queue),
+	b := &Broker{
+		mu:           sync.Mutex{},
+		exchanges:    make(map[string]*exchange.Exchange),
+		queues:       make(map[string]*queue.Queue),
+		persistQueue: make(chan interface{}, 100),
 	}
+	return b
+}
+
+func (b *Broker) Start(ctx context.Context) {
+
+	go func() {
+		var (
+			persistentWg sync.WaitGroup
+		)
+		// only one start instance will be running so safely say we will only be closing the
+		// chan
+		defer close(b.persistQueue)
+
+		workersSize := 10 // aribtary chosen might tweak later
+		for i := 0; i < workersSize; i++ {
+			persistentWg.Add(1)
+			go func() {
+				defer persistentWg.Done()
+				b.processStream(b.persistQueue, workersSize)
+			}()
+		}
+
+		persistentWg.Wait()
+	}()
+
 }
 
 // CreateExchange creates an exchange with the given type

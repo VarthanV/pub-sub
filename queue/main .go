@@ -3,7 +3,7 @@ package queue
 import (
 	"sync"
 
-	"github.com/VarthanV/pub-sub/pkg/messages"
+	"github.com/VarthanV/pub-sub/messages"
 )
 
 type Queue struct {

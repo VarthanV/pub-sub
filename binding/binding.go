@@ -1,6 +1,6 @@
 package binding
 
-import "github.com/VarthanV/pub-sub/pkg/queue"
+import "github.com/VarthanV/pub-sub/queue"
 
 type Binding struct {
 	Key    string

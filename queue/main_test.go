@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VarthanV/pub-sub/pkg/messages"
-	"github.com/VarthanV/pub-sub/pkg/queue"
+	"github.com/VarthanV/pub-sub/messages"
+	"github.com/VarthanV/pub-sub/queue"
 )
 
 func TestQueue(t *testing.T) {

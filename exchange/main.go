@@ -1,6 +1,6 @@
 package exchange
 
-import "github.com/VarthanV/pub-sub/pkg/binding"
+import "github.com/VarthanV/pub-sub/binding"
 
 type ExchangeType string
 
