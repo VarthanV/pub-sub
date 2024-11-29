@@ -10,11 +10,14 @@ type Queue struct {
 	mu       sync.Mutex
 	Name     string
 	messages []messages.Message
+	Durable  bool
 }
 
-func New() *Queue {
+func New(name string, durable bool) *Queue {
 	return &Queue{
 		messages: make([]messages.Message, 0),
+		Name:     name,
+		Durable:  durable,
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 
 func TestQueue(t *testing.T) {
 	// Create a new queue
-	q := queue.New()
+	q := queue.New("foo", false)
 
 	// Test if the queue is empty initially
 	if !q.IsEmpty() {
