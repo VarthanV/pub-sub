@@ -3,6 +3,7 @@ package messages
 import "time"
 
 type Message struct {
-	TTL  time.Duration
+	ID   string
+	TTL  time.Time
 	Body []byte
 }
