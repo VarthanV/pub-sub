@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/VarthanV/pub-sub/broker"
-	"github.com/VarthanV/pub-sub/httpserver"
 	"github.com/VarthanV/pub-sub/pkg/config"
 	"github.com/VarthanV/pub-sub/pkg/database"
+	"github.com/VarthanV/pub-sub/server"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,10 +25,10 @@ func main() {
 	// Init broker
 	b := broker.New(db)
 
-	controller := httpserver.NewController(db, b)
+	controller := server.NewController(db, b)
 
 	go func() {
-		httpserver.InitServer(cfg.Server.HTTPPort, controller)
+		server.InitServer(cfg.Server.HTTPPort, controller)
 	}()
 
 	b.Start(context.Background())

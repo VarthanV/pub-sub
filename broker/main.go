@@ -80,10 +80,11 @@ func (b *broker) CreateExchange(name string, exchangeType exchange.ExchangeType)
 
 	_, ok := b.exchanges[name]
 	if ok {
-		errors.Handle(errors.ErrExchangeAlreadyExists)
+		return nil
 	}
 
 	b.exchanges[name] = exchange.New(name, exchangeType)
+	logrus.Info("Created exchange ", name)
 	return nil
 }
 

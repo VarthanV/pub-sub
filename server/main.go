@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func InitServer(port string, controller *HTTPController) {
+func InitServer(port string, controller *Controller) {
 	r := gin.Default()
 
 	r.GET("/ping", func(ctx *gin.Context) {
@@ -16,6 +16,7 @@ func InitServer(port string, controller *HTTPController) {
 	})
 
 	logrus.Infof("HTTP server listening on %s", port)
+	InitRoutes(r, controller)
 	r.Run(fmt.Sprintf(":%s", port))
 
 }
