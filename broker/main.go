@@ -155,6 +155,12 @@ func (b *broker) BindQueue(ctx context.Context, queueName, exchangeName, binding
 		}
 	}
 	bi.Queues = append(bi.Queues, q)
+
+	b.persistQueue <- &models.Binding{
+		ExchangeName: exchangeName,
+		Key:          bindingKey,
+		Queues:       []models.Queue{{Name: exchange.Name}},
+	}
 	return nil
 }
 

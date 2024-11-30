@@ -7,10 +7,13 @@ func InitRoutes(r *gin.Engine, ctrl *Controller) {
 	wsGroup := r.Group("/ws")
 	exchangeGroup := r.Group("/exchanges")
 	queueGroup := r.Group("/queues")
+	bindingGroup := r.Group("/bindings")
 
 	wsGroup.GET("", ctrl.HandleSubscription)
 
 	exchangeGroup.POST("", ctrl.CreateExchange)
 
 	queueGroup.POST("", ctrl.CreateQueue)
+
+	bindingGroup.POST("", ctrl.CreateBinding)
 }
