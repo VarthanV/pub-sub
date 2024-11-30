@@ -19,10 +19,14 @@ type SyncConfiguration struct {
 	CheckpointInSeconds int `mapstructure:"CHECKPOINT_IN_SECONDS"`
 }
 
+type WorkerConfiguration struct {
+	MaxWorkersAllowedConcurrentlyForRealtimeUpdates int `mapstructure:"MAX_WORKERS_ALLOWED_CONCURRENTLY_FOR_REAL_TIME_UPDATES"`
+}
 type Config struct {
 	Server            ServerConfiguration   `mapstructure:",squash"`
 	Database          DatabaseConfiguration `mapstructure:",squash"`
 	SyncConfiguration SyncConfiguration     `mapstructure:",squash"`
+	WorkerConfig      WorkerConfiguration   `mapstructure:",squash"`
 }
 
 func Load() (*Config, error) {

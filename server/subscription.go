@@ -9,6 +9,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type messageType string
+
+const (
+	messageTypeSubscribe messageType = "SUBSCRIBE"
+)
+
+type message struct {
+	Type    messageType            `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
+}
+
 var upgrader = websocket.Upgrader{
 	// allow all origins as of now
 	CheckOrigin: func(r *http.Request) bool {
@@ -27,15 +38,12 @@ func (c *Controller) HandleSubscription(ctx *gin.Context) {
 	defer conn.Close()
 
 	for {
-		messageType, message, err := conn.ReadMessage()
+		var (
+			msg = message{}
+		)
+		err := conn.ReadJSON(&msg)
 		if err != nil {
-			break
-		}
-
-		logrus.Info("Received: " + string(message))
-
-		err = conn.WriteMessage(messageType, message)
-		if err != nil {
+			logrus.Error("error in reading connection ", err)
 			break
 		}
 	}

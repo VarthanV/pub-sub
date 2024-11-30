@@ -2,7 +2,10 @@ package broker
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/VarthanV/pub-sub/binding"
 	"github.com/VarthanV/pub-sub/errors"
@@ -18,10 +21,8 @@ import (
 	"github.com/VarthanV/pub-sub/queue"
 )
 
-// broker orchestrates the  whole pub-sub process
-
 type Broker interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context) error
 	CreateExchange(ctx context.Context, name string, exchangeType exchange.ExchangeType) error
 	CreateQueue(ctx context.Context, name string, durable bool) error
 	BindQueue(ctx context.Context, queueName, exchangeName, bindingKey string) error
@@ -29,6 +30,13 @@ type Broker interface {
 	PublishMessage(ctx context.Context, exchangeName string, routingKey string, message interface{}) error
 }
 
+const (
+	BrokerStateClosed int32 = iota
+	BrokerStateRunning
+	BrokerStateSettingUp
+)
+
+// broker orchestrates the  whole pub-sub process
 type broker struct {
 	mu sync.RWMutex
 
@@ -40,7 +48,9 @@ type broker struct {
 	// mapping of queues available in the current run-time
 	queues map[string]*queue.Queue
 
-	subscriptions map[string][]*websocket.Conn
+	subscriptions      map[string][]*websocket.Conn
+	realtimeUpdatesSem chan struct{}
+	currentState       atomic.Int32
 }
 
 func New(db *gorm.DB, cfg *config.Config) Broker {
@@ -50,20 +60,76 @@ func New(db *gorm.DB, cfg *config.Config) Broker {
 		queues:        make(map[string]*queue.Queue),
 		db:            db,
 		subscriptions: make(map[string][]*websocket.Conn),
-		cfg:           cfg,
+		realtimeUpdatesSem: make(chan struct{},
+			cfg.WorkerConfig.MaxWorkersAllowedConcurrentlyForRealtimeUpdates),
+		cfg: cfg,
 	}
 	return b
 }
 
-func (b *broker) Start(ctx context.Context) {
+func (b *broker) Start(ctx context.Context) error {
+	var (
+		errorChan     = make(chan error, 1)
+		isStaredChan  = make(chan bool, 1)
+		startDeadline <-chan time.Time
+	)
 
-	logrus.Info("Started broker.....")
+	if b.currentState.Load() == int32(BrokerStateRunning) {
+		// currently only allowing only one instance of broker
+		// to be running
+		logrus.Fatal("broker already running")
+	}
+
 	go func() {
+		defer close(isStaredChan)
+		defer close(errorChan)
 
+		// Rebuild broker
+
+		// Setup tokens in sem for configuring workers
+		for i := 0; i <
+			b.cfg.WorkerConfig.MaxWorkersAllowedConcurrentlyForRealtimeUpdates; i++ {
+			b.realtimeUpdatesSem <- struct{}{}
+		}
+
+		isStaredChan <- true
 	}()
 
-	<-ctx.Done()
+	// See if deadline already there in the context else we derive a custom deadline for starting
+	// and make it done
 
+	_, ok := ctx.Deadline()
+	if !ok {
+		// FIXME: take the deadline from config
+		logrus.Infof("deadline not enforced in base ctx ,setting deadline for %d  minutes", 1)
+		startDeadline = time.After(time.Minute * 1)
+	}
+
+	for {
+		select {
+		case e, ok := <-errorChan:
+			if ok {
+				logrus.Error("error in startup ", e)
+				return e
+			}
+
+		case v, ok := <-isStaredChan:
+			if ok && v {
+				b.currentState.Store(BrokerStateRunning)
+				logrus.Info("Started broker.....")
+				return nil
+			}
+
+		case <-ctx.Done():
+			logrus.Error("context done")
+			return fmt.Errorf("context done")
+
+		case <-startDeadline:
+			logrus.Error("start deadline exceeded")
+			return fmt.Errorf("start deadline exceeded")
+
+		}
+	}
 }
 
 // CreateExchange creates an exchange with the given type
@@ -185,12 +251,25 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 		// Send to all queues and corresponding subscribers
 		for _, binding := range e.Bindings {
 			for _, q := range binding.Queues {
-				// Enqueue the message to the queue
-				// Marshalled message
-				q.Enqueue(messages.Message{
+				msg := messages.Message{
 					ID:   uuid.NewString(),
 					Body: message,
-				})
+				}
+				// Enqueue the message to the queue
+				q.Enqueue(msg)
+
+				for _, conn := range b.subscriptions[q.Name] {
+					go func() {
+						<-b.realtimeUpdatesSem
+						conn.SetWriteDeadline(time.Now().Add(time.Minute))
+						err := conn.WriteJSON(msg)
+						if err != nil {
+							logrus.Error("error in writing to conn ", err)
+						}
+						b.realtimeUpdatesSem <- struct{}{}
+					}()
+				}
+
 			}
 		}
 	}

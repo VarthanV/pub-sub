@@ -27,10 +27,12 @@ func main() {
 
 	controller := server.NewController(db, b)
 
-	go func() {
-		server.InitServer(cfg.Server.HTTPPort, controller)
-	}()
+	logrus.Info("Starting broker.....")
+	err = b.Start(context.Background())
+	if err != nil {
+		logrus.Fatal("error in starting broker ", err)
+	}
 
-	b.Start(context.Background())
+	server.InitServer(cfg.Server.HTTPPort, controller)
 
 }
