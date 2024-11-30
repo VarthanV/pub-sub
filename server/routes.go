@@ -8,6 +8,7 @@ func InitRoutes(r *gin.Engine, ctrl *Controller) {
 	exchangeGroup := r.Group("/exchanges")
 	queueGroup := r.Group("/queues")
 	bindingGroup := r.Group("/bindings")
+	publishGroup := r.Group("/publish")
 
 	wsGroup.GET("", ctrl.HandleSubscription)
 
@@ -16,4 +17,6 @@ func InitRoutes(r *gin.Engine, ctrl *Controller) {
 	queueGroup.POST("", ctrl.CreateQueue)
 
 	bindingGroup.POST("", ctrl.CreateBinding)
+
+	publishGroup.POST("", ctrl.Publish)
 }

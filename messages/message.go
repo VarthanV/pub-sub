@@ -3,7 +3,7 @@ package messages
 import "time"
 
 type Message struct {
-	ID   string
-	TTL  time.Time
-	Body interface{}
+	ID   string      `json:"id"`
+	TTL  time.Time   `json:"ttl"`
+	Body interface{} `json:"body"`
 }

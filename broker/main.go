@@ -233,6 +233,7 @@ func (b *broker) BindQueue(ctx context.Context, queueName, exchangeName, binding
 func (b *broker) Subscribe(ctx context.Context, queueName string, conn *websocket.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	logrus.Info("subscribed to queue ", queueName)
 	b.subscriptions[queueName] = append(b.subscriptions[queueName], conn)
 	return nil
 }
@@ -246,8 +247,11 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 		return errors.Handle(errors.ErrExchangeDoesnotExist)
 	}
 
+	logrus.Info("Found exchange...")
+
 	switch e.ExchangeType {
 	case exchange.ExchangeTypeFanOut:
+		logrus.Info("Fan out data to connections")
 		// Send to all queues and corresponding subscribers
 		for _, binding := range e.Bindings {
 			for _, q := range binding.Queues {
@@ -258,6 +262,7 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 				// Enqueue the message to the queue
 				q.Enqueue(msg)
 
+				logrus.Info("found connections ", len(b.subscriptions[q.Name]))
 				for _, conn := range b.subscriptions[q.Name] {
 					go func() {
 						<-b.realtimeUpdatesSem
@@ -267,6 +272,7 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 							logrus.Error("error in writing to conn ", err)
 						}
 						b.realtimeUpdatesSem <- struct{}{}
+						logrus.Info("written to conn")
 					}()
 				}
 
