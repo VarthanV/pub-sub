@@ -1,18 +1,18 @@
 package config
 
 import (
-	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type ServerConfiguration struct {
-	Port         string `mapstructure:"SERVER_PORT"`
+	HTTPPort     string `mapstructure:"HTTP_PORT"`
 	AllowedHosts string `mapstructure:"ALLOWED_HOSTS"`
 }
 
 type DatabaseConfiguration struct {
-	DatabaseName string `mapstructure:"DATABASE_NAME"`
+	Name         string `mapstructure:"DATABASE_NAME"`
+	DoMigrations bool   `mapstructure:"DO_MIGRATIONS"`
 }
 
 type Config struct {
@@ -21,24 +21,25 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	var result map[string]interface{}
 	var config Config
+
+	// Set config file and read it
 	viper.SetConfigFile(".env")
 	if err := viper.ReadInConfig(); err != nil {
-		logrus.Error("error in reading from .env ", err)
+		logrus.Warn("Could not read .env file, falling back to environment variables only")
+	}
+
+	// Bind environment variables
+	viper.AutomaticEnv()
+
+	// Optionally, set defaults
+	viper.SetDefault("DO_MIGRATIONS", false)
+
+	// Decode into the struct
+	if err := viper.Unmarshal(&config); err != nil {
+		logrus.Errorf("Unable to decode config: %v", err)
 		return nil, err
 	}
 
-	err := viper.Unmarshal(&result)
-	if err != nil {
-		logrus.Errorf("Unable to decode into map, %v", err)
-		return nil, err
-	}
-
-	err = mapstructure.Decode(result, &config)
-	if err != nil {
-		logrus.Error("error in decoding result ", err)
-		return nil, err
-	}
 	return &config, nil
 }

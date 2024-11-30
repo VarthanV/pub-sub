@@ -6,14 +6,23 @@ import (
 
 	"github.com/VarthanV/pub-sub/binding"
 	"github.com/VarthanV/pub-sub/errors"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	"github.com/VarthanV/pub-sub/exchange"
 	"github.com/VarthanV/pub-sub/queue"
 )
 
-// Broker orchestrates the  whole pub-sub process
-type Broker struct {
+// broker orchestrates the  whole pub-sub process
+
+type Broker interface {
+	Start(ctx context.Context)
+	CreateExchange(name string, exchangeType exchange.ExchangeType) error
+	CreateQueue(name string, durable bool) error
+	BindQueue(queueName, exchangeName, bindingKey string) error
+}
+
+type broker struct {
 	db *gorm.DB
 	mu sync.Mutex
 	// mapping of exchanges available in the current run-time
@@ -26,18 +35,20 @@ type Broker struct {
 	persistQueue chan interface{}
 }
 
-func New() *Broker {
-	b := &Broker{
+func New(db *gorm.DB) Broker {
+	b := &broker{
 		mu:           sync.Mutex{},
 		exchanges:    make(map[string]*exchange.Exchange),
 		queues:       make(map[string]*queue.Queue),
 		persistQueue: make(chan interface{}, 100),
+		db:           db,
 	}
 	return b
 }
 
-func (b *Broker) Start(ctx context.Context) {
+func (b *broker) Start(ctx context.Context) {
 
+	logrus.Info("Started broker.....")
 	go func() {
 		var (
 			persistentWg sync.WaitGroup
@@ -58,10 +69,12 @@ func (b *Broker) Start(ctx context.Context) {
 		persistentWg.Wait()
 	}()
 
+	<-ctx.Done()
+
 }
 
 // CreateExchange creates an exchange with the given type
-func (b *Broker) CreateExchange(name string, exchangeType exchange.ExchangeType) error {
+func (b *broker) CreateExchange(name string, exchangeType exchange.ExchangeType) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -76,7 +89,7 @@ func (b *Broker) CreateExchange(name string, exchangeType exchange.ExchangeType)
 
 // CreateQueue creates a queue, if needs to survive the rebuidling during restart
 // can be configured using the `durable` flag
-func (b *Broker) CreateQueue(name string, durable bool) error {
+func (b *broker) CreateQueue(name string, durable bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -89,7 +102,7 @@ func (b *Broker) CreateQueue(name string, durable bool) error {
 }
 
 // BindQueue binds a queue to an exchange  by the given binding key
-func (b *Broker) BindQueue(queueName, exchangeName, bindingKey string) error {
+func (b *broker) BindQueue(queueName, exchangeName, bindingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange, exists := b.exchanges[exchangeName]
