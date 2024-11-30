@@ -4,7 +4,7 @@ import (
 	"github.com/VarthanV/pub-sub/exchange"
 )
 
-type ExchangeModel struct {
+type Exchange struct {
 	Base
 	exchange.Exchange
 	Name string `gorm:"uniqueIndex"`
