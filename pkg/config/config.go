@@ -15,9 +15,14 @@ type DatabaseConfiguration struct {
 	DoMigrations bool   `mapstructure:"DO_MIGRATIONS"`
 }
 
+type SyncConfiguration struct {
+	CheckpointInSeconds int `mapstructure:"CHECKPOINT_IN_SECONDS"`
+}
+
 type Config struct {
-	Server   ServerConfiguration   `mapstructure:",squash"`
-	Database DatabaseConfiguration `mapstructure:",squash"`
+	Server            ServerConfiguration   `mapstructure:",squash"`
+	Database          DatabaseConfiguration `mapstructure:",squash"`
+	SyncConfiguration SyncConfiguration     `mapstructure:",squash"`
 }
 
 func Load() (*Config, error) {

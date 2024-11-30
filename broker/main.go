@@ -3,9 +3,12 @@ package broker
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/VarthanV/pub-sub/binding"
 	"github.com/VarthanV/pub-sub/errors"
+	"github.com/VarthanV/pub-sub/models"
+	"github.com/VarthanV/pub-sub/pkg/config"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -25,8 +28,11 @@ type Broker interface {
 }
 
 type broker struct {
-	db *gorm.DB
 	mu sync.Mutex
+
+	db *gorm.DB
+
+	cfg *config.Config
 	// mapping of exchanges available in the current run-time
 	exchanges map[string]*exchange.Exchange
 	// mapping of queues available in the current run-time
@@ -39,7 +45,7 @@ type broker struct {
 	subscriptions map[string][]*websocket.Conn
 }
 
-func New(db *gorm.DB) Broker {
+func New(db *gorm.DB, cfg *config.Config) Broker {
 	b := &broker{
 		mu:            sync.Mutex{},
 		exchanges:     make(map[string]*exchange.Exchange),
@@ -47,6 +53,7 @@ func New(db *gorm.DB) Broker {
 		persistQueue:  make(chan interface{}, 100),
 		db:            db,
 		subscriptions: make(map[string][]*websocket.Conn),
+		cfg:           cfg,
 	}
 	return b
 }
@@ -60,14 +67,14 @@ func (b *broker) Start(ctx context.Context) {
 		)
 		// only one start instance will be running so safely say we will only be closing the
 		// chan
-		defer close(b.persistQueue)
 
 		workersSize := 10 // aribtary chosen might tweak later
 		for i := 0; i < workersSize; i++ {
 			persistentWg.Add(1)
 			go func() {
 				defer persistentWg.Done()
-				b.processStream(b.persistQueue, workersSize)
+				b.processStream(ctx, b.persistQueue, workersSize,
+					time.Second*time.Duration(b.cfg.SyncConfiguration.CheckpointInSeconds))
 			}()
 		}
 
@@ -85,11 +92,15 @@ func (b *broker) CreateExchange(ctx context.Context, name string, exchangeType e
 
 	_, ok := b.exchanges[name]
 	if ok {
-		return nil
+		return errors.Handle(errors.ErrExchangeAlreadyExists)
 	}
 
 	b.exchanges[name] = exchange.New(name, exchangeType)
 	logrus.Info("Created exchange ", name)
+	b.persistQueue <- &models.Exchange{
+		Name:         name,
+		ExchangeType: exchangeType,
+	}
 	return nil
 }
 
@@ -101,9 +112,14 @@ func (b *broker) CreateQueue(ctx context.Context, name string, durable bool) err
 
 	_, ok := b.queues[name]
 	if ok {
-		errors.Handle(errors.ErrExchangeAlreadyExists)
+		return errors.Handle(errors.ErrExchangeAlreadyExists)
 	}
 	b.queues[name] = queue.New(name, durable)
+	logrus.Info("Created queue ", name)
+	b.persistQueue <- &models.Queue{
+		Name:    name,
+		Durable: durable,
+	}
 	return nil
 }
 
@@ -118,7 +134,7 @@ func (b *broker) BindQueue(ctx context.Context, queueName, exchangeName, binding
 
 	q, exists := b.queues[queueName]
 	if !exists {
-		errors.Handle(errors.ErrQueueDoesnotExist)
+		return errors.Handle(errors.ErrQueueDoesnotExist)
 	}
 	if exchange.Bindings == nil {
 		exchange.Bindings = make(map[string]*binding.Binding)

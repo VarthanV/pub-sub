@@ -23,7 +23,7 @@ func main() {
 		logrus.Fatal("error in initializing db ", err)
 	}
 	// Init broker
-	b := broker.New(db)
+	b := broker.New(db, cfg)
 
 	controller := server.NewController(db, b)
 

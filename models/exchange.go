@@ -1,11 +1,10 @@
 package models
 
-import (
-	"github.com/VarthanV/pub-sub/exchange"
-)
+import "github.com/VarthanV/pub-sub/exchange"
 
 type Exchange struct {
 	Base
-	exchange.Exchange
-	Name string `gorm:"uniqueIndex"`
+	Name         string                `gorm:"uniqueIndex" json:"name,omitempty"`
+	ExchangeType exchange.ExchangeType `json:"exchange_type,omitempty"`
+	Bindings     []Binding             `gorm:"many2many:exchange_bindings"`
 }

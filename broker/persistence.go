@@ -1,9 +1,14 @@
 package broker
 
-import "github.com/sirupsen/logrus"
+import (
+	"context"
+	"time"
 
-func (b *broker) processStream(ch <-chan interface{}, bufferSize int) {
-	writer := NewWriter(b.db, bufferSize)
+	"github.com/sirupsen/logrus"
+)
+
+func (b *broker) processStream(ctx context.Context, ch <-chan interface{}, bufferSize int, duration time.Duration) {
+	writer := NewWriter(ctx, b.db, bufferSize, duration)
 	for val := range ch {
 		_, err := writer.Write(val)
 		if err != nil {

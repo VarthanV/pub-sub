@@ -12,7 +12,7 @@ const (
 type Exchange struct {
 	Name         string
 	ExchangeType ExchangeType
-	Bindings     map[string]*binding.Binding `gorm:"-"`
+	Bindings     map[string]*binding.Binding
 }
 
 func New(name string, exchangeType ExchangeType) *Exchange {

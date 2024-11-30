@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type CreateExchangeRequest struct {
+type createExchangeRequest struct {
 	Name string                `json:"name" binding:"required"`
 	Type exchange.ExchangeType `json:"type" binding:"required"`
 }
@@ -16,7 +16,7 @@ type CreateExchangeRequest struct {
 func (c *Controller) CreateExchange(ctx *gin.Context) {
 
 	var (
-		request = CreateExchangeRequest{}
+		request = createExchangeRequest{}
 	)
 
 	err := ctx.ShouldBindJSON(&request)
@@ -32,5 +32,6 @@ func (c *Controller) CreateExchange(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+
 	ctx.Status(http.StatusOK)
 }
