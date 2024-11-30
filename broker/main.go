@@ -272,7 +272,6 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 							logrus.Error("error in writing to conn ", err)
 						}
 						b.realtimeUpdatesSem <- struct{}{}
-						logrus.Info("written to conn")
 					}()
 				}
 

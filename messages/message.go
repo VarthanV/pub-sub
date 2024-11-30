@@ -1,9 +1,7 @@
 package messages
 
-import "time"
-
 type Message struct {
-	ID   string      `json:"id"`
-	TTL  time.Time   `json:"ttl"`
-	Body interface{} `json:"body"`
+	ID        string      `json:"unique_id"`
+	Body      interface{} `json:"body"`
+	QueueName string
 }

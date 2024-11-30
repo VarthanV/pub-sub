@@ -32,7 +32,9 @@ func Init(dbName string, doMigrations bool) (*gorm.DB, error) {
 		err = db.AutoMigrate(
 			&models.Exchange{},
 			&models.Queue{},
-			&models.Binding{})
+			&models.Binding{},
+			&models.Message{},
+		)
 		if err != nil {
 			logrus.Error("unable to do migrations")
 			return nil, err
