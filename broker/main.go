@@ -6,6 +6,7 @@ import (
 
 	"github.com/VarthanV/pub-sub/binding"
 	"github.com/VarthanV/pub-sub/errors"
+	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
@@ -17,9 +18,10 @@ import (
 
 type Broker interface {
 	Start(ctx context.Context)
-	CreateExchange(name string, exchangeType exchange.ExchangeType) error
-	CreateQueue(name string, durable bool) error
-	BindQueue(queueName, exchangeName, bindingKey string) error
+	CreateExchange(ctx context.Context, name string, exchangeType exchange.ExchangeType) error
+	CreateQueue(ctx context.Context, name string, durable bool) error
+	BindQueue(ctx context.Context, queueName, exchangeName, bindingKey string) error
+	Subscribe(ctx context.Context, queueName string, conn *websocket.Conn) error
 }
 
 type broker struct {
@@ -33,15 +35,18 @@ type broker struct {
 	// fixed amount of workers will be bound to this channel , buffered writers will be used and the data
 	// will be flushed when the buffer gets full or when the ticker ticks whichever happens first
 	persistQueue chan interface{}
+
+	subscriptions map[string][]*websocket.Conn
 }
 
 func New(db *gorm.DB) Broker {
 	b := &broker{
-		mu:           sync.Mutex{},
-		exchanges:    make(map[string]*exchange.Exchange),
-		queues:       make(map[string]*queue.Queue),
-		persistQueue: make(chan interface{}, 100),
-		db:           db,
+		mu:            sync.Mutex{},
+		exchanges:     make(map[string]*exchange.Exchange),
+		queues:        make(map[string]*queue.Queue),
+		persistQueue:  make(chan interface{}, 100),
+		db:            db,
+		subscriptions: make(map[string][]*websocket.Conn),
 	}
 	return b
 }
@@ -74,7 +79,7 @@ func (b *broker) Start(ctx context.Context) {
 }
 
 // CreateExchange creates an exchange with the given type
-func (b *broker) CreateExchange(name string, exchangeType exchange.ExchangeType) error {
+func (b *broker) CreateExchange(ctx context.Context, name string, exchangeType exchange.ExchangeType) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -90,7 +95,7 @@ func (b *broker) CreateExchange(name string, exchangeType exchange.ExchangeType)
 
 // CreateQueue creates a queue, if needs to survive the rebuidling during restart
 // can be configured using the `durable` flag
-func (b *broker) CreateQueue(name string, durable bool) error {
+func (b *broker) CreateQueue(ctx context.Context, name string, durable bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -103,7 +108,7 @@ func (b *broker) CreateQueue(name string, durable bool) error {
 }
 
 // BindQueue binds a queue to an exchange  by the given binding key
-func (b *broker) BindQueue(queueName, exchangeName, bindingKey string) error {
+func (b *broker) BindQueue(ctx context.Context, queueName, exchangeName, bindingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange, exists := b.exchanges[exchangeName]
@@ -134,5 +139,13 @@ func (b *broker) BindQueue(queueName, exchangeName, bindingKey string) error {
 		}
 	}
 	bi.Queues = append(bi.Queues, q)
+	return nil
+}
+
+// Subscribe subscribes a websocket connection to a topic for exchange of realtime updates.
+func (b *broker) Subscribe(ctx context.Context, queueName string, conn *websocket.Conn) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.subscriptions[queueName] = append(b.subscriptions[queueName], conn)
 	return nil
 }

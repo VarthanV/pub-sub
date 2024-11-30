@@ -26,7 +26,7 @@ func (c *Controller) CreateExchange(ctx *gin.Context) {
 		return
 	}
 
-	err = c.broker.CreateExchange(request.Name, request.Type)
+	err = c.broker.CreateExchange(ctx, request.Name, request.Type)
 	if err != nil {
 		logrus.Error("error in creating exchange ", err)
 		ctx.AbortWithError(http.StatusInternalServerError, err)
