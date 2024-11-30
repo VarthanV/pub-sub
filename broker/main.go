@@ -6,8 +6,10 @@ import (
 
 	"github.com/VarthanV/pub-sub/binding"
 	"github.com/VarthanV/pub-sub/errors"
+	"github.com/VarthanV/pub-sub/messages"
 	"github.com/VarthanV/pub-sub/models"
 	"github.com/VarthanV/pub-sub/pkg/config"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -24,10 +26,11 @@ type Broker interface {
 	CreateQueue(ctx context.Context, name string, durable bool) error
 	BindQueue(ctx context.Context, queueName, exchangeName, bindingKey string) error
 	Subscribe(ctx context.Context, queueName string, conn *websocket.Conn) error
+	PublishMessage(ctx context.Context, exchangeName string, routingKey string, message interface{}) error
 }
 
 type broker struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	db *gorm.DB
 
@@ -42,7 +45,7 @@ type broker struct {
 
 func New(db *gorm.DB, cfg *config.Config) Broker {
 	b := &broker{
-		mu:            sync.Mutex{},
+		mu:            sync.RWMutex{},
 		exchanges:     make(map[string]*exchange.Exchange),
 		queues:        make(map[string]*queue.Queue),
 		db:            db,
@@ -166,4 +169,32 @@ func (b *broker) Subscribe(ctx context.Context, queueName string, conn *websocke
 	defer b.mu.Unlock()
 	b.subscriptions[queueName] = append(b.subscriptions[queueName], conn)
 	return nil
+}
+
+// PublishMessage publishes message.
+func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routingKey string, message interface{}) error {
+	b.mu.RLock()
+	defer b.mu.RLock()
+	e, exists := b.exchanges[exchangeName]
+	if !exists {
+		return errors.Handle(errors.ErrExchangeDoesnotExist)
+	}
+
+	switch e.ExchangeType {
+	case exchange.ExchangeTypeFanOut:
+		// Send to all queues and corresponding subscribers
+		for _, binding := range e.Bindings {
+			for _, q := range binding.Queues {
+				// Enqueue the message to the queue
+				// Marshalled message
+				q.Enqueue(messages.Message{
+					ID:   uuid.NewString(),
+					Body: message,
+				})
+			}
+		}
+	}
+
+	return nil
+
 }
