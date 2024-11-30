@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/VarthanV/pub-sub/messages"
+	"gorm.io/gorm"
 )
 
 type Queue struct {
@@ -11,6 +12,7 @@ type Queue struct {
 	Name     string
 	messages []messages.Message
 	Durable  bool
+	db       *gorm.DB
 }
 
 func New(name string, durable bool) *Queue {
@@ -19,6 +21,12 @@ func New(name string, durable bool) *Queue {
 		Name:     name,
 		Durable:  durable,
 	}
+}
+
+func (qe *Queue) SetDB(db *gorm.DB) {
+	qe.mu.Lock()
+	defer qe.mu.Unlock()
+	qe.db = db
 }
 
 func (qe *Queue) Enqueue(msg messages.Message) {
