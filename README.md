@@ -133,8 +133,54 @@ A toy real-time Pub-Sub messaging system with durable queues, dynamic routing, a
 
 ### 🔨 Prerequisites
 - **Go** (1.18+)
-- **PostgreSQL/MySQL**
-- **Docker** (optional, for containerized deployment)
+
+
+
+## Environment Variables  
+
+### Server Configuration  
+- **`HTTP_PORT`**  
+  The port on which the application listens for incoming HTTP requests.  
+  - **Default:** `8060`  
+  - Example: `http://localhost:8060`  
+
+- **`ALLOWED_HOSTS`**  
+  Specifies the hosts allowed to access the server. Use `*` to allow all hosts (for development purposes).  
+  - **Default:** `*`  
+  - Note: Restrict this in production for security.  
+
+### Database Configuration  
+- **`DATABASE_NAME`**  
+  The name of the database used by the application.  
+  - **Default:** `pub-sub`  
+
+### Migration Configuration  
+- **`DO_MIGRATIONS`**  
+  Indicates whether to run database migrations automatically at application startup.  
+  - **Default:** `true`  
+  - Values:  
+    - `true` - Run migrations  
+    - `false` - Skip migrations  
+
+### Real-Time Updates Configuration  
+- **`CHECKPOINT_IN_SECONDS`**  
+  The interval, in seconds, for checkpointing or saving the application state.  
+  - **Default:** `10`  
+
+- **`MAX_WORKERS_ALLOWED_CONCURRENTLY_FOR_REAL_TIME_UPDATES`**  
+  The maximum number of worker threads/processes allocated for handling real-time updates.  
+  - **Default:** `10`  
+
+### Synchronization Configuration  
+- **`WORKERS_ALLOWED_FOR_SYNC`**  
+  The maximum number of worker threads/processes allocated for synchronization tasks.  
+  - **Default:** `20`  
+
+## Notes  
+- Adjust these variables as per your environment and performance requirements.  
+- Ensure `ALLOWED_HOSTS` is set appropriately in production to avoid unauthorized access.  
+
+- Check ``.env.example`` for same env
 
 ### 🚀 Run the Broker
 ```bash
