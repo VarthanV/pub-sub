@@ -11,15 +11,20 @@ type Queue struct {
 	mu       sync.Mutex
 	Name     string
 	messages []messages.Message
-	Durable  bool
-	db       *gorm.DB
+	// Queue which flushes messages added to this queue periodically
+	// and flushes the buffer
+	MessagesToPersist []*messages.Message
+	Durable           bool
+	db                *gorm.DB
 }
 
 func New(name string, durable bool) *Queue {
+
 	return &Queue{
-		messages: make([]messages.Message, 0),
-		Name:     name,
-		Durable:  durable,
+		messages:          make([]messages.Message, 0),
+		Name:              name,
+		Durable:           durable,
+		MessagesToPersist: nil,
 	}
 }
 
@@ -33,6 +38,9 @@ func (qe *Queue) Enqueue(msg messages.Message) {
 	qe.mu.Lock()
 	defer qe.mu.Unlock()
 	qe.messages = append(qe.messages, msg)
+	if qe.Durable {
+		qe.MessagesToPersist = append(qe.MessagesToPersist, &msg)
+	}
 }
 
 func (qe *Queue) IsEmpty() bool {

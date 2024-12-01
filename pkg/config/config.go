@@ -16,12 +16,14 @@ type DatabaseConfiguration struct {
 }
 
 type SyncConfiguration struct {
-	CheckpointInSeconds int `mapstructure:"CHECKPOINT_IN_SECONDS"`
+	CheckpointInSeconds   int `mapstructure:"CHECKPOINT_IN_SECONDS"`
+	WorkersAllowedForSync int `mapstructure:"WORKERS_ALLOWED_FOR_SYNC"`
 }
 
 type WorkerConfiguration struct {
 	MaxWorkersAllowedConcurrentlyForRealtimeUpdates int `mapstructure:"MAX_WORKERS_ALLOWED_CONCURRENTLY_FOR_REAL_TIME_UPDATES"`
 }
+
 type Config struct {
 	Server            ServerConfiguration   `mapstructure:",squash"`
 	Database          DatabaseConfiguration `mapstructure:",squash"`

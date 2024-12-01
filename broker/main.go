@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -51,6 +52,7 @@ type broker struct {
 
 	subscriptions      map[string][]*websocket.Conn
 	realtimeUpdatesSem chan struct{}
+	syncToDbSem        chan struct{}
 	currentState       atomic.Int32
 }
 
@@ -61,6 +63,7 @@ func New(db *gorm.DB, cfg *config.Config) Broker {
 		queues:        make(map[string]*queue.Queue),
 		db:            db,
 		subscriptions: make(map[string][]*websocket.Conn),
+		syncToDbSem:   make(chan struct{}, cfg.SyncConfiguration.WorkersAllowedForSync),
 		realtimeUpdatesSem: make(chan struct{},
 			cfg.WorkerConfig.MaxWorkersAllowedConcurrentlyForRealtimeUpdates),
 		cfg: cfg,
@@ -81,6 +84,7 @@ func (b *broker) Start(ctx context.Context) error {
 		logrus.Fatal("broker already running")
 	}
 
+	// Start routine
 	go func() {
 		defer close(isStaredChan)
 		defer close(errorChan)
@@ -93,7 +97,64 @@ func (b *broker) Start(ctx context.Context) error {
 			b.realtimeUpdatesSem <- struct{}{}
 		}
 
+		for i := 0; i < b.cfg.SyncConfiguration.WorkersAllowedForSync; i++ {
+			b.syncToDbSem <- struct{}{}
+		}
+
 		isStaredChan <- true
+	}()
+
+	go func() {
+		ticker := time.NewTicker(time.Second * time.Duration(b.cfg.SyncConfiguration.CheckpointInSeconds))
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				logrus.Info("Checkpoint routine triggered")
+				// routine to persist all messages into db
+				for name, q := range b.queues {
+					logrus.Debug("picked q ", name)
+					if !q.Durable {
+						logrus.Debug("Queue not durable")
+						continue
+					}
+
+					go func() {
+						logrus.Info("Processing queue:", name)
+						<-b.syncToDbSem
+						// Transform message to models
+
+						messages := []models.Message{}
+						logrus.Info("found messages ", q.MessagesToPersist)
+						for _, m := range q.MessagesToPersist {
+							body, _ := json.Marshal(m.Body)
+							messages = append(messages, models.Message{
+								QueueName: name,
+								UniqueID:  m.ID,
+								Body:      body,
+							})
+						}
+
+						err := b.db.
+							Model(&models.Message{}).
+							CreateInBatches(messages, len(messages)).Error
+						if err != nil {
+							logrus.Error("error in bulk inserting messages ", err)
+						} else {
+							q.MessagesToPersist = nil
+						}
+
+						b.syncToDbSem <- struct{}{}
+					}()
+
+				}
+			case <-ctx.Done():
+				logrus.Warn("context done")
+				return
+
+			}
+		}
 	}()
 
 	// See if deadline already there in the context else we derive a custom deadline for starting
