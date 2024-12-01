@@ -27,6 +27,7 @@ type Broker interface {
 	CreateQueue(ctx context.Context, name string, durable bool) error
 	BindQueue(ctx context.Context, queueName, exchangeName, bindingKey string) error
 	Subscribe(ctx context.Context, queueName string, conn *websocket.Conn) error
+	Unsubscribe(ctx context.Context, queueName string, conn *websocket.Conn) error
 	PublishMessage(ctx context.Context, exchangeName string, routingKey string, message interface{}) error
 }
 
@@ -276,9 +277,70 @@ func (b *broker) PublishMessage(ctx context.Context, exchangeName string, routin
 				}
 
 			}
+
+		}
+
+	case exchange.ExchangeTypeDirect:
+		logrus.Info("Directing to excatly bound routing key")
+		binding, exists := e.Bindings[routingKey]
+		if !exists {
+			// Drop messages
+			logrus.Warnf("No binding found for routing key: %s in exchange: %s", routingKey, exchangeName)
+			return nil
+		}
+
+		for _, q := range binding.Queues {
+			// Enqueue the message to the queue
+			msg := messages.Message{
+				ID:   uuid.NewString(),
+				Body: message,
+			}
+			q.Enqueue(msg)
+
+			logrus.Info("found connections ", len(b.subscriptions[q.Name]))
+
+			for _, conn := range b.subscriptions[q.Name] {
+				go func() {
+					<-b.realtimeUpdatesSem
+					conn.SetWriteDeadline(time.Now().Add(time.Minute))
+					err := conn.WriteJSON(msg)
+					if err != nil {
+						logrus.Error("error in writing to conn ", err)
+					}
+					b.realtimeUpdatesSem <- struct{}{}
+				}()
+			}
+
 		}
 	}
 
 	return nil
 
+}
+
+// Unsubscribe unsubscribes a subscriber from the relatime updates of the queue.
+func (b *broker) Unsubscribe(ctx context.Context, queueName string, conn *websocket.Conn) error {
+	connections, ok := b.subscriptions[queueName]
+	if !ok {
+		if err := errors.Handle(errors.ErrSubscriptionDoesnotExist); err != nil {
+			return err
+		}
+	}
+
+	indexToDelete := -1
+	for i, c := range connections {
+		if c.NetConn() == conn.NetConn() {
+			indexToDelete = i
+			err := c.Close()
+			if err != nil {
+				logrus.Error("error in closing connection ", err)
+			}
+		}
+	}
+
+	if indexToDelete >= 0 {
+		b.subscriptions[queueName] = deleteElement(connections, indexToDelete)
+	}
+
+	return nil
 }

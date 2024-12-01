@@ -30,6 +30,12 @@ var (
 	ErrQueueDoesnotExist = Error{Code: "Q002", Message: "Queue doesn't exist"}
 )
 
+// Subscription related errors
+
+var (
+	ErrSubscriptionDoesnotExist = Error{Code: "S001", Message: "Subscription doesnot exist"}
+)
+
 func Handle(err error) error {
 	logrus.Error(err)
 	return err
