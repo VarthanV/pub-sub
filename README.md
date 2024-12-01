@@ -2,6 +2,10 @@
 
 A toy real-time Pub-Sub messaging system with durable queues, dynamic routing, and WebSocket support for seamless communication. 🌐🚀
 
+# Architecture
+
+![](./assets/architecture.png)
+
 # Pipeline
 
 - Minimal frontend (WIP)
