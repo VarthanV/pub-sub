@@ -34,6 +34,12 @@ func main() {
 		logrus.Fatal("error in starting broker ", err)
 	}
 
+	logrus.Info(`
+  _       _      __      _  
+ |_) | | |_) __ (_  | | |_) 
+ |   |_| |_)    __) |_| |_) 
+                            
+`)
 	server.InitServer(cfg.Server.HTTPPort, controller)
 
 }
